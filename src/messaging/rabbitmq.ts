@@ -1,6 +1,6 @@
 import amqplib from 'amqplib';
 import type { ChannelModel, Channel } from 'amqplib';
-import { env } from '../config/env.js';
+import { env } from '../config/env';
 import { logger } from '../observability/logger.js';
 
 let connection: ChannelModel;
@@ -19,8 +19,8 @@ export async function connectRabbitMQ(url?: string): Promise<{ connection: Chann
   await channel.assertQueue(env.QUEUE_NAME, {
     durable: true,
     arguments: {
-      'x-dead-letter-exchange': `${env.EXCHANGE_NAME}.dlx`,
-      'x-dead-letter-routing-key': `dlq.${env.QUEUE_NAME}`,
+      'x-dead-letter-exchange': 'mipit.dlx',
+      'x-dead-letter-routing-key': `dlq.spei`,
     },
   });
 
