@@ -8,6 +8,7 @@ describe('canonicalToSpeiPayload', () => {
       fx: { rate: 17.5 },
       debtor: { account_id: 'SPEI-012345678901234567', name: 'Juan Pérez' },
       creditor: { account_id: 'SPEI-098765432109876543', name: 'María López' },
+      alias: { type: 'CLABE', value: '098765432109876543' },
       purpose: 'Pago de servicios',
       reference: 'REF-12345',
       origin: { rail: 'SPEI' },
@@ -32,6 +33,7 @@ describe('canonicalToSpeiPayload', () => {
       amount: { value: 500, currency: 'MXN' },
       debtor: { account_id: '012345678901234567' },
       creditor: { account_id: '098765432109876543' },
+      alias: { type: 'CLABE', value: '098765432109876543' },
       origin: { rail: 'SPEI' },
       destination: {},
     };
@@ -40,5 +42,85 @@ describe('canonicalToSpeiPayload', () => {
 
     expect(result.monto).toBe(500);
     expect(result.destino).toBe('SPEI');
+  });
+
+  it('should strip SPEI- prefix from CLABEs', () => {
+    const canonical = {
+      payment_id: 'PAY-003',
+      amount: { value: 1000, currency: 'MXN' },
+      debtor: { account_id: 'SPEI-012345678901234567', name: 'Juan' },
+      creditor: { account_id: 'SPEI-098765432109876543', name: 'Maria' },
+      alias: { type: 'CLABE', value: '098765432109876543' },
+      origin: { rail: 'SPEI' },
+      destination: { rail: 'SPEI' },
+    };
+
+    const result = canonicalToSpeiPayload(canonical);
+
+    expect(result.clabe_origen).toBe('012345678901234567');
+    expect(result.clabe_destino).toBe('098765432109876543');
+  });
+
+  it('should throw error for invalid CLABE (not 18 digits)', () => {
+    const canonical = {
+      payment_id: 'PAY-004',
+      amount: { value: 100, currency: 'MXN' },
+      debtor: { account_id: '012345678901234567' },
+      creditor: { account_id: '12345' },
+      alias: { type: 'CLABE', value: '12345' },
+      origin: { rail: 'SPEI' },
+      destination: { rail: 'SPEI' },
+    };
+
+    expect(() => canonicalToSpeiPayload(canonical)).toThrow('Invalid CLABE format');
+  });
+
+  it('should throw error for CLABE with non-digit characters', () => {
+    const canonical = {
+      payment_id: 'PAY-005',
+      amount: { value: 100, currency: 'MXN' },
+      debtor: { account_id: '012345678901234567' },
+      creditor: { account_id: 'ABCDEFGHIJKLMNOPQR' },
+      alias: { type: 'CLABE', value: 'ABCDEFGHIJKLMNOPQR' },
+      origin: { rail: 'SPEI' },
+      destination: { rail: 'SPEI' },
+    };
+
+    expect(() => canonicalToSpeiPayload(canonical)).toThrow('Invalid CLABE format');
+  });
+
+  it('should always set moneda to MXN', () => {
+    const canonical = {
+      payment_id: 'PAY-006',
+      amount: { value: 100, currency: 'USD' },
+      debtor: { account_id: '012345678901234567' },
+      creditor: { account_id: '098765432109876543' },
+      alias: { type: 'CLABE', value: '098765432109876543' },
+      origin: { rail: 'SPEI' },
+      destination: { rail: 'SPEI' },
+    };
+
+    const result = canonicalToSpeiPayload(canonical);
+
+    expect(result.moneda).toBe('MXN');
+  });
+
+  it('should truncate concepto to 35 and referencia to 140 chars', () => {
+    const canonical = {
+      payment_id: 'PAY-007',
+      amount: { value: 100, currency: 'MXN' },
+      debtor: { account_id: '012345678901234567' },
+      creditor: { account_id: '098765432109876543' },
+      alias: { type: 'CLABE', value: '098765432109876543' },
+      purpose: 'X'.repeat(50),
+      reference: 'Y'.repeat(200),
+      origin: { rail: 'SPEI' },
+      destination: { rail: 'SPEI' },
+    };
+
+    const result = canonicalToSpeiPayload(canonical);
+
+    expect(result.concepto_pago).toHaveLength(35);
+    expect(result.referencia_numerica).toHaveLength(140);
   });
 });

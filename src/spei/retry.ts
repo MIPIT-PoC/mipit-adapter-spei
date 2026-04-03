@@ -1,4 +1,5 @@
 import { logger } from '../observability/logger.js';
+import { speiRetryCount } from '../observability/metrics.js';
 
 interface RetryOptions {
   maxRetries: number;
@@ -17,6 +18,7 @@ export async function withRetry<T>(
     } catch (err) {
       if (attempt === maxRetries) throw err;
 
+      speiRetryCount.inc();
       const delay = baseDelayMs * Math.pow(2, attempt - 1);
       logger.warn({ attempt, maxRetries, delay, err }, 'Retry after failure');
       await new Promise((r) => setTimeout(r, delay));

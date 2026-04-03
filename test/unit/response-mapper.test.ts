@@ -37,4 +37,34 @@ describe('speiResponseToAck', () => {
       message: 'CLABE destino inválida',
     });
   });
+
+  it('should default error message when mensaje_error is missing', () => {
+    const response: SpeiPaymentResponse = {
+      spei_tx_id: 'SPEI-TX-003',
+      estatus: 'RECHAZADO',
+      monto: 100,
+      moneda: 'MXN',
+      timestamp: '2026-01-01T00:00:00Z',
+      codigo_error: 'SPEI_TIMEOUT',
+    };
+
+    const ack = speiResponseToAck(response);
+
+    expect(ack.error?.message).toBe('Error SPEI desconocido');
+  });
+
+  it('should include raw_response with full response object', () => {
+    const response: SpeiPaymentResponse = {
+      spei_tx_id: 'SPEI-TX-004',
+      estatus: 'ACEPTADO',
+      monto: 500,
+      moneda: 'MXN',
+      timestamp: '2026-01-01T00:00:00Z',
+    };
+
+    const ack = speiResponseToAck(response);
+
+    expect(ack.raw_response).toBeDefined();
+    expect((ack.raw_response as any).spei_tx_id).toBe('SPEI-TX-004');
+  });
 });

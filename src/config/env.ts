@@ -15,6 +15,7 @@ const envSchema = z.object({
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url('OTEL_EXPORTER_OTLP_ENDPOINT must be a valid URL').describe('OpenTelemetry OTLP endpoint'),
   OTEL_SERVICE_NAME: z.string().min(1, 'OTEL_SERVICE_NAME cannot be empty').default('mipit-adapter-spei').describe('OpenTelemetry service name'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info').describe('Logging level'),
+  HEALTH_PORT: z.coerce.number().int().positive().default(9102).describe('Health/metrics server port'),
   INSTANCE_ID: z.string().default(`spei-${process.pid}`).describe('Instance identifier'),
 });
 
