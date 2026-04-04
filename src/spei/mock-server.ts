@@ -26,6 +26,13 @@ import { validateClabeDetailed } from './clabe-validator.js';
 const app = express();
 app.use(express.json());
 
+/**
+ * PoC mode: when MOCK_ENFORCE_HOURS=false (default in PoC), SPEI operating
+ * window checks are bypassed so tests run deterministically at any time.
+ * Set MOCK_ENFORCE_HOURS=true to simulate real CECOBAN/BANXICO constraints.
+ */
+const ENFORCE_HOURS = (process.env.MOCK_ENFORCE_HOURS ?? 'false') === 'true';
+
 /** In-memory idempotency store: claveRastreo → settled response */
 const processedTransfers = new Map<string, SpeiCecobanResponse>();
 
@@ -168,7 +175,7 @@ app.post('/spei/v3/transferencias', (req, res) => {
   }
 
   // === Validation: SPEI operating window (R08 — payment suspended outside window) ===
-  if (!isSpeiWindowOpen()) {
+  if (ENFORCE_HOURS && !isSpeiWindowOpen()) {
     const r = buildRechazadaResponse(claveRastreo, monto, 'R08',
       'Pago suspendido. SPEI opera de lunes a viernes de 07:00 a 17:30 (CST). Intente en horario hábil.');
     processedTransfers.set(claveRastreo, r);
