@@ -17,6 +17,8 @@
  */
 
 import express from 'express';
+import { registerOAuth2Routes, oauthMiddleware } from './oauth-mock.js';
+import { registerAdminRoutes, mockConfig, mockStats } from './admin-routes.js';
 import { ulid } from 'ulid';
 import { env } from '../config/env.js';
 import { logger } from '../observability/logger.js';
@@ -24,7 +26,16 @@ import type { SpeiCecobanRequest, SpeiCecobanResponse } from './types.js';
 import { validateClabeDetailed } from './clabe-validator.js';
 
 const app = express();
+app.use((_req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (_req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 app.use(express.json());
+registerOAuth2Routes(app);
+app.use(oauthMiddleware);
 
 /**
  * PoC mode: when MOCK_ENFORCE_HOURS=false (default in PoC), SPEI operating
@@ -35,6 +46,8 @@ const ENFORCE_HOURS = (process.env.MOCK_ENFORCE_HOURS ?? 'false') === 'true';
 
 /** In-memory idempotency store: claveRastreo → settled response */
 const processedTransfers = new Map<string, SpeiCecobanResponse>();
+
+registerAdminRoutes(app, processedTransfers);
 
 /** RFC México: persona física = 4 letters + 6 digits + 3 alphanum | persona moral = 3 letters + 6 digits + 3 alphanum */
 const RFC_REGEX = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i;
@@ -182,54 +195,80 @@ app.post('/spei/v3/transferencias', (req, res) => {
     return res.status(200).json(r);
   }
 
-  // === Simulate CECOBAN rejection scenarios ===
+  // Track stats
+  mockStats.totalReceived++;
+  mockStats.lastPaymentAt = new Date().toISOString();
+
+  // Admin: mock disabled
+  if (!mockConfig.enabled) {
+    return res.status(503).json({
+      error: 'SERVICIO_NO_DISPONIBLE',
+      detalle: 'El servicio SPEI está temporalmente fuera de servicio por mantenimiento.',
+    });
+  }
+
+  // Admin: force reject next
+  if (mockConfig.forceRejectNext) {
+    mockConfig.forceRejectNext = false;
+    mockStats.totalRejected++;
+    const r = buildRechazadaResponse(claveRastreo, monto, mockConfig.forceRejectCode,
+      `[ADMIN] Rechazo forzado por el simulador (código: ${mockConfig.forceRejectCode}).`);
+    processedTransfers.set(claveRastreo, r);
+    return res.status(200).json(r);
+  }
+
+  // Admin: force timeout next
+  if (mockConfig.forceTimeoutNext) {
+    mockConfig.forceTimeoutNext = false;
+    mockStats.totalTimeout++;
+    logger.info({ claveRastreo }, 'SPEI mock: forcing 30s timeout (admin)');
+    setTimeout(() => {
+      res.status(504).json({ error: 'TIMEOUT', detalle: 'SPEI no respondió dentro del plazo.' });
+    }, 30_000);
+    return;
+  }
+
+  // === Simulate CECOBAN rejection scenarios (relative weights within rejectionRate, PIX-style tiers) ===
   const failRoll = Math.random();
 
-  if (failRoll < 0.04) {
-    // 4% — Insufficient funds
+  if (failRoll < mockConfig.rejectionRate * 0.4) {
     const r = buildRechazadaResponse(claveRastreo, monto, 'R01',
       'Fondos insuficientes. La cuenta ordenante no tiene saldo suficiente para cubrir el monto más el IVA.');
     processedTransfers.set(claveRastreo, r);
     return res.status(200).json(r);
   }
-  if (failRoll < 0.06) {
-    // 2% — Account not found / CLABE inexistente
+  if (failRoll < mockConfig.rejectionRate * 0.6) {
+    mockStats.totalRejected++;
     const r = buildRechazadaResponse(claveRastreo, monto, 'R03',
       'Sin cuenta. La CLABE del beneficiario no está registrada en el sistema SPEI.');
     processedTransfers.set(claveRastreo, r);
     return res.status(200).json(r);
   }
-  if (failRoll < 0.075) {
-    // 1.5% — Closed account
+  if (failRoll < mockConfig.rejectionRate * 0.8) {
+    mockStats.totalRejected++;
     const r = buildRechazadaResponse(claveRastreo, monto, 'R02',
       'Cuenta cerrada. La cuenta CLABE del beneficiario ha sido cancelada.');
     processedTransfers.set(claveRastreo, r);
     return res.status(200).json(r);
   }
-  if (failRoll < 0.085) {
-    // 1% — Daily limit reached
+  if (failRoll < mockConfig.rejectionRate * 0.9) {
+    mockStats.totalRejected++;
     const r = buildRechazadaResponse(claveRastreo, monto, 'LIM',
       'Límite operativo diario alcanzado para la institución ordenante en la sesión SPEI.');
     processedTransfers.set(claveRastreo, r);
     return res.status(200).json(r);
   }
-  if (failRoll < 0.09) {
-    // 0.5% — Blocked account
-    const r = buildRechazadaResponse(claveRastreo, monto, 'BLQ',
-      'Cuenta bloqueada. La cuenta del beneficiario está bloqueada por la institución receptora.');
-    processedTransfers.set(claveRastreo, r);
-    return res.status(200).json(r);
-  }
-  if (failRoll < 0.095) {
-    // 0.5% — Not authorized
+  if (failRoll < mockConfig.rejectionRate) {
+    mockStats.totalRejected++;
     const r = buildRechazadaResponse(claveRastreo, monto, 'R05',
       'Operación no autorizada. La institución ordenante no tiene autorización para realizar este tipo de pago.');
     processedTransfers.set(claveRastreo, r);
     return res.status(200).json(r);
   }
 
-  // === Success: simulate SPEI settlement latency (80–450ms) ===
-  const latency = 80 + Math.random() * 370;
+  // === Success: simulate SPEI settlement latency (configurable) ===
+  const latency = mockConfig.minLatencyMs
+    + Math.random() * (mockConfig.maxLatencyMs - mockConfig.minLatencyMs);
   setTimeout(() => {
     const now = new Date();
     const fechaOperacion = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -246,7 +285,34 @@ app.post('/spei/v3/transferencias', (req, res) => {
       iva: body.iva ?? 0,
     };
 
+    const settlementDelayMs = mockConfig.settlementDelayMs;
+    if (settlementDelayMs > 0) {
+      const pending: SpeiCecobanResponse = {
+        claveRastreo,
+        estatus: 'EN_PROCESO',
+        monto,
+        fechaOperacion,
+        iva: body.iva ?? 0,
+      };
+      processedTransfers.set(claveRastreo, pending);
+      res.status(202).json(pending);
+      setTimeout(() => {
+        processedTransfers.set(claveRastreo, response);
+        mockStats.totalAccepted++;
+        logger.info({
+          claveRastreo,
+          folioControl,
+          estatus: 'LIQUIDADA',
+          monto,
+          latency_ms: Math.round(latency),
+          settlementDelayMs,
+        }, 'SPEI mock: transfer liquidada after delayed settlement (CECOBAN)');
+      }, settlementDelayMs);
+      return;
+    }
+
     processedTransfers.set(claveRastreo, response);
+    mockStats.totalAccepted++;
 
     logger.info({
       claveRastreo,
