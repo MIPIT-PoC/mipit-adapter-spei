@@ -27,7 +27,9 @@ export interface MockConfig {
 
 const defaultConfig: MockConfig = {
   enabled: true,
-  rejectionRate: 0.095,
+  // MOCK_REJECTION_RATE lets the validation/load suites pin the random
+  // rejection probability; defaults to 0.095 to keep realistic noise.
+  rejectionRate: clampRate(process.env.MOCK_REJECTION_RATE, 0.095),
   minLatencyMs: 80,
   maxLatencyMs: 450,
   settlementDelayMs: 0,
@@ -35,6 +37,13 @@ const defaultConfig: MockConfig = {
   forceTimeoutNext: false,
   forceRejectCode: 'R01',
 };
+
+function clampRate(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === '') return fallback;
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) return fallback;
+  return Math.max(0, Math.min(1, parsed));
+}
 
 export const mockConfig: MockConfig = { ...defaultConfig };
 
