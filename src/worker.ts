@@ -6,7 +6,7 @@ import { speiResponseToAck } from './spei/response-mapper.js';
 import { sendSpeiPayment } from './spei/client.js';
 import { publishAck } from './messaging/publisher.js';
 import { logger } from './observability/logger.js';
-import { speiPaymentsTotal, speiPaymentLatency } from './observability/metrics.js';
+import { speiPaymentsTotal, speiPaymentLatency, recordAdapterRequest } from './observability/metrics.js';
 
 export interface PaymentRouteMessage {
   payment_id: string;
@@ -76,7 +76,12 @@ export async function startWorker(channel: Channel) {
 
       publishAck(channel, ackMessage );
 
-      speiPaymentsTotal.inc({ status: railAck.status === 'ACCEPTED' ? 'success' : 'rejected' });
+      // P07 — unified helper also feeds mipit_adapter_requests_total{rail="SPEI"}.
+      recordAdapterRequest(
+        railAck.status === 'ACCEPTED' ? 'success' : 'rejected',
+        latencyMs,
+        railAck.status === 'ACCEPTED' ? undefined : railAck.error?.code,
+      );
       speiPaymentLatency.observe({ status: 'success' }, latencyMs);
 
       logger.info({
@@ -107,7 +112,7 @@ export async function startWorker(channel: Channel) {
 
       publishAck(channel, failAck );
 
-      speiPaymentsTotal.inc({ status: 'error' });
+      recordAdapterRequest('error', latencyMs, 'ADAPTER_ERROR');
       speiPaymentLatency.observe({ status: 'error' }, latencyMs);
 
       channel.nack(msg, false, false);
