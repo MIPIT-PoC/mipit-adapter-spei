@@ -33,8 +33,11 @@ interface CanonicalPacs008 {
  * and builds the full CECOBAN structure per BANXICO specification.
  */
 export function canonicalToSpeiPayload(canonical: CanonicalPacs008): SpeiCecobanRequest {
-  const fxRate = canonical.fx?.rate ?? 1;
-  const localAmount = canonical.amount.value * fxRate;
+  // P05 — Prefer canonical.fx.local_amount (set by normalizer post-FX); falls
+  // back to amount * rate for legacy callers; SPEI is MXN, 2 decimals.
+  const localAmount =
+    (canonical.fx as { local_amount?: number } | undefined)?.local_amount
+    ?? canonical.amount.value * (canonical.fx?.rate ?? 1);
   const monto = Math.round(localAmount * 100) / 100;
 
   // Strip SPEI- prefix to get raw CLABE
