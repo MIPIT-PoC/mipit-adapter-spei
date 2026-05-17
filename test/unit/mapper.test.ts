@@ -34,8 +34,10 @@ describe('canonicalToSpeiPayload', () => {
     expect(result).toHaveProperty('empresa');
     expect(result).toHaveProperty('fechaOperacion');
     expect(result).toHaveProperty('monto', 1500.00);
-    expect(result).toHaveProperty('institucionContraparte', '006');
-    expect(result).toHaveProperty('institucionOperante', '002');
+    // P03 — Banxico catalog upgrades CLABE prefix '006' to BANOBRAS code '37006'
+    expect(result).toHaveProperty('institucionContraparte', '37006');
+    // P03 — Banxico catalog upgrades CLABE prefix '002' to BANAMEX '40002'
+    expect(result).toHaveProperty('institucionOperante', '40002');
     expect(result).toHaveProperty('cuentaBeneficiario', '006050000000000025');
     expect(result).toHaveProperty('nombreBeneficiario', 'María López');
   });
@@ -133,20 +135,21 @@ describe('canonicalToSpeiPayload', () => {
     expect(result.claveRastreo.length).toBeLessThanOrEqual(30);
   });
 
-  it('should populate SPEI institution codes correctly', () => {
+  it('should populate SPEI institution codes correctly (P03 5-digit Banxico)', () => {
     const canonical = {
       payment_id: 'PMT-007',
       amount: { value: 400.00, currency: 'MXN' },
       debtor: { account_id: '002050000000000016' },
       creditor: { account_id: '006050000000000025', name: 'Test' },
       alias: { type: 'CLABE', value: '006050000000000025' },
-      origin: { rail: 'SPEI', institutionCode: '144' }, // Banco Bancrea
-      destination: { rail: 'SPEI', institutionCode: '137' }, // Bankaool
+      // P03 — 5-digit Banxico catalog codes
+      origin: { rail: 'SPEI', institutionCode: '40144' },      // Banco Bancrea
+      destination: { rail: 'SPEI', institutionCode: '40137' }, // Bankaool
     };
 
     const result = canonicalToSpeiPayload(canonical);
 
-    expect(result.institucionOperante).toBe('144');
-    expect(result.institucionContraparte).toBe('137');
+    expect(result.institucionOperante).toBe('40144');
+    expect(result.institucionContraparte).toBe('40137');
   });
 });

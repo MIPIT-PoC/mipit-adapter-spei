@@ -105,11 +105,12 @@ app.post('/spei/v3/transferencias', (req, res) => {
     });
   }
 
-  // === Validation: claveRastreo max 30 alphanumeric chars ===
-  if (!/^[A-Z0-9a-z\-_]{1,30}$/.test(claveRastreo)) {
+  // P03 — claveRastreo: 1-30 alphanumeric ONLY (no hyphens, no underscores)
+  // per Banxico CECOBAN spec / stpmex-python field validator.
+  if (!/^[A-Za-z0-9]{1,30}$/.test(claveRastreo)) {
     return res.status(400).json({
       error: 'CLAVE_RASTREO_INVALIDA',
-      detalle: 'claveRastreo debe tener máximo 30 caracteres alfanuméricos.',
+      detalle: 'claveRastreo debe tener máximo 30 caracteres alfanuméricos (sin guiones ni underscores).',
       campo: 'claveRastreo',
     });
   }
@@ -131,12 +132,12 @@ app.post('/spei/v3/transferencias', (req, res) => {
     });
   }
 
-  // === Validation: referenciaNumerica (0–9999999, 7 digits max) ===
+  // P03 — referenciaNumerica: 1–9_999_999 (CECOBAN reserves 0 as sentinel).
   if (referenciaNumerica !== undefined) {
-    if (!Number.isInteger(referenciaNumerica) || referenciaNumerica < 0 || referenciaNumerica > 9_999_999) {
+    if (!Number.isInteger(referenciaNumerica) || referenciaNumerica < 1 || referenciaNumerica > 9_999_999) {
       return res.status(400).json({
         error: 'REFERENCIA_INVALIDA',
-        detalle: 'referenciaNumerica debe ser un entero de 0 a 9,999,999 (máximo 7 dígitos).',
+        detalle: 'referenciaNumerica debe ser un entero de 1 a 9,999,999 (máximo 7 dígitos).',
         campo: 'referenciaNumerica',
       });
     }
@@ -167,8 +168,9 @@ app.post('/spei/v3/transferencias', (req, res) => {
     });
   }
 
-  // === Validation: Institution code (3–5 digit BANXICO code) ===
-  if (institucionContraparte && !/^\d{3,5}$/.test(institucionContraparte)) {
+  // P03 — institucionContraparte: 5 digits from Banxico catalog (40xxx banks,
+  // 90xxx non-bank). Previous 3-5 was lax and accepted CLABE prefixes.
+  if (institucionContraparte && !/^\d{5}$/.test(institucionContraparte)) {
     return res.status(400).json({
       error: 'INSTITUCION_INVALIDA',
       detalle: `Código de institución inválido: '${institucionContraparte}'. Debe ser 3–5 dígitos del catálogo BANXICO.`,
@@ -285,31 +287,14 @@ app.post('/spei/v3/transferencias', (req, res) => {
       iva: body.iva ?? 0,
     };
 
-    const settlementDelayMs = mockConfig.settlementDelayMs;
-    if (settlementDelayMs > 0) {
-      const pending: SpeiCecobanResponse = {
-        claveRastreo,
-        estatus: 'EN_PROCESO',
-        monto,
-        fechaOperacion,
-        iva: body.iva ?? 0,
-      };
-      processedTransfers.set(claveRastreo, pending);
-      res.status(202).json(pending);
-      setTimeout(() => {
-        processedTransfers.set(claveRastreo, response);
-        mockStats.totalAccepted++;
-        logger.info({
-          claveRastreo,
-          folioControl,
-          estatus: 'LIQUIDADA',
-          monto,
-          latency_ms: Math.round(latency),
-          settlementDelayMs,
-        }, 'SPEI mock: transfer liquidada after delayed settlement (CECOBAN)');
-      }, settlementDelayMs);
-      return;
-    }
+    // P03 — Removed the broken `settlementDelayMs > 0` branch.
+    // Previously: mock returned 202 EN_PROCESO immediately and flipped to
+    // LIQUIDADA after a delay. The adapter's response-mapper maps EN_PROCESO
+    // to status 'ERROR', so the worker emitted a FAILED ack even when the
+    // mock would later settle. Net effect: feature was end-to-end broken.
+    // Sync settlement is sufficient for PoC. If async settlement is needed,
+    // implement PENDING handling in the adapter first (P03/P06 follow-up).
+    void mockConfig; // settlementDelayMs no longer consumed
 
     processedTransfers.set(claveRastreo, response);
     mockStats.totalAccepted++;
