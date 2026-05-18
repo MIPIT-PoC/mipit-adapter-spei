@@ -20,6 +20,8 @@ interface CanonicalPacs008 {
   };
   alias: { type: string; value: string };
   purpose?: string;
+  /** W6.3 — ISO 20022 ExternalCategoryPurpose1Code (CASH/SALA/TAXS/...). */
+  ctgyPurp?: string;
   reference?: string;
   remittanceInfo?: string;
   origin: { rail: string; institutionCode?: string };
@@ -87,6 +89,11 @@ export function canonicalToSpeiPayload(canonical: CanonicalPacs008): SpeiCecoban
   // Folio origen from payment_id
   const folioOrigen = canonical.payment_id.replace('PMT-', '').substring(0, 19);
 
+  // W6.3 — derive Banxico `tipoPago` from canonical.ctgyPurp (ISO 20022
+  // ExternalCategoryPurpose1Code). Defaults to 1 (tercero-a-tercero) when
+  // the canonical did not carry one upstream.
+  const tipoPago = ctgyPurpToTipoPago(canonical.ctgyPurp);
+
   const request: SpeiCecobanRequest = {
     claveRastreo,
     empresa: 'MIPIT',
@@ -96,7 +103,7 @@ export function canonicalToSpeiPayload(canonical: CanonicalPacs008): SpeiCecoban
     institucionOperante,
     monto,
     iva: 0.00,
-    tipoPago: 1,
+    tipoPago,
     tipoCuentaBeneficiario: 40,  // CLABE
     nombreBeneficiario: (canonical.creditor.name ?? 'Beneficiario MIPIT').substring(0, 39),
     cuentaBeneficiario: clabeDestino,
@@ -125,4 +132,33 @@ export function canonicalToSpeiPayload(canonical: CanonicalPacs008): SpeiCecoban
   }
 
   return request;
+}
+
+/**
+ * W6.3 — Map ISO 20022 `ExternalCategoryPurpose1Code` → Banxico SPEI
+ * `tipoPago`. Catálogo Banxico SPEI Manual de Operaciones cap. 4.
+ *
+ *   CASH → 1  (tercero-a-tercero, mismo banco / cross-bank P2P) — default
+ *   INTC → 4  (B2B mismo banco / inter-company)
+ *   SALA → 5  (nómina)
+ *   TAXS → 14 (pago de impuesto federal)
+ *   SUPP → 7  (proveedores)
+ *   DVPM → 16 (tarjeta débito)
+ *   TRAD → 17 (otra factura de servicios)
+ *
+ * Falls back to 1 for unmapped / missing codes, matching the previous
+ * hardcoded behaviour while restoring semantic info when the canonical
+ * carries it.
+ */
+function ctgyPurpToTipoPago(ctgyPurp: string | undefined): number {
+  const map: Record<string, number> = {
+    CASH: 1,
+    INTC: 4,
+    SALA: 5,
+    SUPP: 7,
+    TAXS: 14,
+    DVPM: 16,
+    TRAD: 17,
+  };
+  return (ctgyPurp && map[ctgyPurp]) ? map[ctgyPurp] : 1;
 }

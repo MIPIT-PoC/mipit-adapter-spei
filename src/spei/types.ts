@@ -54,13 +54,21 @@ export interface SpeiCecobanRequest {
   iva: number;
 
   /**
-   * Payment type code:
-   *   1 = Simple SPEI transfer
-   *   2 = Internal transfer (same institution)
-   *   3 = Payroll payment
-   *   4 = Tax payment (SAT)
+   * Payment type code per Banxico SPEI Manual de Operaciones cap. 4
+   * (catálogo 1..30; subset Wave 6 W6.3 cableado vía ctgyPurp):
+   *   1  = Tercero a tercero (default — simple SPEI transfer)
+   *   2  = Internal transfer (same institution)
+   *   3  = Bank-to-bank
+   *   4  = Inter-company (B2B same institution)
+   *   5  = Nómina (payroll)
+   *   7  = Pago de proveedores
+   *   14 = Pago de impuesto federal (SAT)
+   *   16 = Tarjeta débito
+   *   17 = Servicios
+   *   (additional codes per Banxico catalogue)
+   * Widened to `number` so W6.3 can propagate ctgyPurp → tipoPago mappings.
    */
-  tipoPago: 1 | 2 | 3 | 4;
+  tipoPago: number;
 
   /**
    * Account type of beneficiary:
