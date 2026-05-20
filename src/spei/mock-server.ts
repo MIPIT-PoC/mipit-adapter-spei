@@ -29,7 +29,9 @@ const app = express();
 app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Port of Carlos commit 90ca951 from adapter-breb main — broader CORS for mock UI.
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Max-Age', '3600');
   if (_req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -395,6 +397,54 @@ function buildRechazadaResponse(
     iva: 0,
   };
 }
+
+/**
+ * Frontend API Simulator endpoint — port of Carlos commit 90ca951 (breb main).
+ * Provides a simplified one-shot simulation flow consumed by mipit-mock-spei-ui.
+ * NOT part of BANXICO SPEI; lives alongside the CECOBAN routes for demo convenience.
+ */
+app.post('/api/simulate/spei', (req, res) => {
+  try {
+    const { debtorAlias, creditorAlias, amount, currency, purpose, reference } = req.body;
+
+    if (!debtorAlias || !creditorAlias || !amount || !currency) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['debtorAlias', 'creditorAlias', 'amount', 'currency'],
+      });
+    }
+
+    const shouldFail = Math.random() < 0.1;
+    const paymentId = `SPEI${Date.now()}${Math.random().toString(36).substring(7)}`;
+    const timestamp = new Date().toISOString();
+
+    return res.status(200).json({
+      payment_id: paymentId,
+      status: shouldFail ? 'failed' : 'completed',
+      rail: 'SPEI',
+      timestamp,
+      details: {
+        debtor: debtorAlias,
+        creditor: creditorAlias,
+        amount: Number(amount),
+        currency,
+        purpose: purpose ?? 'P2P',
+        reference: reference ?? 'AUTO',
+        processor_latency_ms: Math.round(80 + Math.random() * 370),
+        error: shouldFail ? {
+          code: 'R01',
+          message: 'CLABE de destino no encontrada en STP',
+        } : null,
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, 'Error in /api/simulate/spei');
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+});
 
 export function startMockServer(port?: number): Promise<import('http').Server> {
   const listenPort = port ?? env.SPEI_MOCK_PORT;
