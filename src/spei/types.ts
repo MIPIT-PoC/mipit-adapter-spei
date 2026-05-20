@@ -54,13 +54,21 @@ export interface SpeiCecobanRequest {
   iva: number;
 
   /**
-   * Payment type code:
-   *   1 = Simple SPEI transfer
-   *   2 = Internal transfer (same institution)
-   *   3 = Payroll payment
-   *   4 = Tax payment (SAT)
+   * Payment type code per Banxico SPEI Manual de Operaciones cap. 4
+   * (catálogo 1..30; subset Wave 6 W6.3 cableado vía ctgyPurp):
+   *   1  = Tercero a tercero (default — simple SPEI transfer)
+   *   2  = Internal transfer (same institution)
+   *   3  = Bank-to-bank
+   *   4  = Inter-company (B2B same institution)
+   *   5  = Nómina (payroll)
+   *   7  = Pago de proveedores
+   *   14 = Pago de impuesto federal (SAT)
+   *   16 = Tarjeta débito
+   *   17 = Servicios
+   *   (additional codes per Banxico catalogue)
+   * Widened to `number` so W6.3 can propagate ctgyPurp → tipoPago mappings.
    */
-  tipoPago: 1 | 2 | 3 | 4;
+  tipoPago: number;
 
   /**
    * Account type of beneficiary:
@@ -152,8 +160,11 @@ export interface SpeiCecobanResponse {
   iva?: number;
 }
 
-/** BANXICO institution codes (abbreviated list) */
-export const SPEI_BANXICO_CODES = {
+/**
+ * P03 — CLABE bank prefixes (3 digits). NOT to be confused with Banxico SPEI
+ * institution codes (5 digits — see SPEI_BANXICO_CODES below).
+ */
+export const CLABE_BANK_PREFIXES = {
   BANAMEX:   '002',
   BANOBRAS:  '006',
   BBVA:      '012',
@@ -164,17 +175,101 @@ export const SPEI_BANXICO_CODES = {
   SCOTIABANK:'044',
   AZTECA:    '127',
   BIENESTAR: '058',
-  MIPIT_SIM: '999', // Simulated institution for PoC
+  MIPIT_SIM: '999',
 } as const;
 
-/** Generates a valid SPEI clave de rastreo (up to 30 alphanumeric chars) */
-export function generateSpeiClaveRastreo(prefix: string = 'MIPIT'): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const seq = Math.floor(Math.random() * 99999999).toString().padStart(8, '0');
-  return `${prefix}${date}${seq}`.substring(0, 30);
+/**
+ * P03 — Banxico SPEI participant institution codes (5 digits).
+ * Real Banxico catalog: 40xxx for banks, 90xxx for non-bank participants.
+ * Source: https://www.banxico.org.mx/servicios/participantes-spei-banco-me.html
+ */
+export const SPEI_BANXICO_CODES = {
+  BANAMEX:    '40002',
+  BANOBRAS:   '37006', // Banca de desarrollo
+  BBVA:       '40012',
+  SANTANDER:  '40014',
+  HSBC:       '40021',
+  BANORTE:    '40072',
+  INBURSA:    '40036',
+  SCOTIABANK: '40044',
+  AZTECA:     '40127',
+  BIENESTAR:  '40058',
+  STP:        '90646',
+  // Simulated PSP for the PoC (90xxx range is non-bank participants)
+  MIPIT_SIM:  '90999',
+} as const;
+
+/**
+ * P03 — CLABE 3-digit prefix → Banxico 5-digit institution code map.
+ * Many CLABE prefixes share an institution code with their parent bank.
+ */
+export const CLABE_TO_BANXICO: Record<string, string> = {
+  '002': SPEI_BANXICO_CODES.BANAMEX,
+  '006': SPEI_BANXICO_CODES.BANOBRAS,
+  '012': SPEI_BANXICO_CODES.BBVA,
+  '014': SPEI_BANXICO_CODES.SANTANDER,
+  '021': SPEI_BANXICO_CODES.HSBC,
+  '036': SPEI_BANXICO_CODES.INBURSA,
+  '044': SPEI_BANXICO_CODES.SCOTIABANK,
+  '058': SPEI_BANXICO_CODES.BIENESTAR,
+  '072': SPEI_BANXICO_CODES.BANORTE,
+  '127': SPEI_BANXICO_CODES.AZTECA,
+  '646': SPEI_BANXICO_CODES.STP,
+  '999': SPEI_BANXICO_CODES.MIPIT_SIM,
+};
+
+export function clabeToInstitutionCode(clabe: string): string | undefined {
+  if (typeof clabe !== 'string' || clabe.length < 3) return undefined;
+  return CLABE_TO_BANXICO[clabe.slice(0, 3)];
 }
 
-/** Generates a 7-digit SPEI numeric reference */
+/**
+ * P03 — Banxico tipoPago catalogue (subset of 31 official values).
+ * Source: Banxico Catálogo de Tipos de Pago.
+ */
+export const SPEI_TIPO_PAGO = {
+  TERCERO_A_TERCERO: 1,
+  TERCERO_PROPIAS:   3,
+  MISMO_BANCO:       4,
+  NOMINA:            5,
+  DEVOLUCION_NO_ACR: 8,
+  COBRANZA:          11,
+  DEVOLUCION_EXT:    12,
+  PAGO_SERVICIOS:    13,
+  PAGO_IMP_FED:      14,
+  PAGO_IMP_EST:      15,
+  TARJETA_DEBITO:    16,
+  TARJETA_CREDITO:   17,
+} as const;
+
+/**
+ * P03 — Generate `claveRastreo`. CECOBAN spec: 1–30 alphanumeric only
+ * (no hyphens, no underscores). Uses CSPRNG for the random suffix.
+ *
+ * Format: PREFIX(5) + YYYYMMDD(8 — local Mexico City UTC-6) + 8 digits = 21 chars.
+ */
+import { randomBytes } from 'node:crypto';
+
+export function generateSpeiClaveRastreo(prefix: string = 'MIPIT'): string {
+  // Mexico City is UTC-6 (or -5 during DST; Banxico eliminated DST in 2022 → fixed UTC-6).
+  const mxNow = new Date(Date.now() - 6 * 3600 * 1000);
+  const yyyy = mxNow.getUTCFullYear();
+  const mm = String(mxNow.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(mxNow.getUTCDate()).padStart(2, '0');
+  const date = `${yyyy}${mm}${dd}`;
+  // 8 random digits via CSPRNG
+  const bytes = randomBytes(4);
+  const num = (bytes.readUInt32BE(0) % 100_000_000).toString().padStart(8, '0');
+  const cleanPrefix = prefix.replace(/[^A-Za-z0-9]/g, '').slice(0, 5);
+  return `${cleanPrefix}${date}${num}`.substring(0, 30);
+}
+
+/**
+ * P03 — Generate a 7-digit numeric reference (1–9_999_999 range).
+ * The previous impl could emit 0 which CECOBAN treats as sentinel/invalid.
+ */
 export function generateSpeiReferencia(): number {
-  return Math.floor(Math.random() * 9999999);
+  const bytes = randomBytes(4);
+  const num = bytes.readUInt32BE(0) % 9_999_999;
+  return num === 0 ? 1 : num; // ensure 1..9_999_999
 }

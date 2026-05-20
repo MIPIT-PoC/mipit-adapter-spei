@@ -82,10 +82,12 @@ describe('canonicalToSpeiPayload', () => {
     expect(result.referenciaNumerica).toBeLessThanOrEqual(9999999);
   });
 
-  it('should set institution codes from origin/destination', () => {
+  it('should set institution codes from origin/destination (P03 5-digit Banxico)', () => {
     const result = canonicalToSpeiPayload(baseCanonical);
-    expect(result.institucionOperante).toBe('999');
-    expect(result.institucionContraparte).toBe('012');
+    // P03 — Banxico catalog: 999 (CLABE prefix) → 90999 (MIPIT_SIM, 90xxx range)
+    //                        012 (CLABE prefix) → 40012 (BBVA Bancomer)
+    expect(result.institucionOperante).toBe('90999');
+    expect(result.institucionContraparte).toBe('40012');
   });
 
   it('should include optional creditor email', () => {
@@ -133,8 +135,8 @@ describe('canonicalToSpeiPayload', () => {
       destination: { rail: 'SPEI' },  // no institutionCode
     };
     const result = canonicalToSpeiPayload(canonical);
-    // VALID_DEST_CLABE starts with '012'
-    expect(result.institucionContraparte).toBe('012');
+    // P03 — VALID_DEST_CLABE starts with '012' → BBVA Bancomer Banxico code is '40012'.
+    expect(result.institucionContraparte).toBe('40012');
   });
 
   it('should throw when CLABE check digit is invalid', () => {

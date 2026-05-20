@@ -4,6 +4,12 @@ jest.mock('../../src/observability/logger', () => ({
 
 jest.mock('../../src/observability/metrics', () => ({
   speiPaymentsTotal: { inc: jest.fn() },
+  // P07 — unified helper; tests check the per-rail counter through the helper.
+  recordAdapterRequest: jest.fn(),
+  adapterRequestsTotal: { inc: jest.fn() },
+  adapterLatencyMs: { observe: jest.fn() },
+  adapterRetriesTotal: { inc: jest.fn() },
+  adapterErrorsTotal: { inc: jest.fn() },
   speiPaymentLatency: { observe: jest.fn() },
   speiRetryCount: { inc: jest.fn() },
 }));
@@ -54,7 +60,7 @@ jest.mock('../../src/messaging/publisher', () => ({
 import { startWorker } from '../../src/worker';
 import { publishAck } from '../../src/messaging/publisher';
 import { sendSpeiPayment } from '../../src/spei/client';
-import { speiPaymentsTotal, speiPaymentLatency } from '../../src/observability/metrics';
+import { speiPaymentLatency, recordAdapterRequest } from '../../src/observability/metrics';
 
 function createMockChannel() {
   const consumers: Array<(msg: any) => Promise<void>> = [];
@@ -107,7 +113,8 @@ describe('startWorker', () => {
 
     expect(publishAck).toHaveBeenCalledTimes(1);
     expect(channel.ack).toHaveBeenCalledTimes(1);
-    expect(speiPaymentsTotal.inc).toHaveBeenCalledWith({ status: 'success' });
+    // P07 — unified helper drives both legacy + new rail-labeled counters.
+    expect(recordAdapterRequest).toHaveBeenCalledWith('success', expect.any(Number), undefined);
     expect(speiPaymentLatency.observe).toHaveBeenCalled();
   });
 
@@ -140,6 +147,6 @@ describe('startWorker', () => {
     expect(ackMsg.status).toBe('FAILED');
     expect(ackMsg.rail_ack.status).toBe('ERROR');
     expect(channel.nack).toHaveBeenCalledWith(expect.anything(), false, false);
-    expect(speiPaymentsTotal.inc).toHaveBeenCalledWith({ status: 'error' });
+    expect(recordAdapterRequest).toHaveBeenCalledWith('error', expect.any(Number), 'ADAPTER_ERROR');
   });
 });
