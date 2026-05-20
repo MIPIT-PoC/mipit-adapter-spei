@@ -77,8 +77,15 @@ export function registerOAuth2Routes(app: Express): void {
 }
 
 export function oauthMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Skip auth for health, oauth, and admin endpoints
-  if (req.path === '/health' || req.path.startsWith('/oauth') || req.path.startsWith('/admin')) {
+  // Skip auth for health, oauth, admin and frontend simulator endpoints.
+  // Audit 4 — /api/simulate/* es el endpoint de demo consumido por
+  // mipit-mock-spei-ui; requerir OAuth ahí rompería la doble-vía UI sin token.
+  if (
+    req.path === '/health' ||
+    req.path.startsWith('/oauth') ||
+    req.path.startsWith('/admin') ||
+    req.path.startsWith('/api/simulate')
+  ) {
     return next();
   }
 
