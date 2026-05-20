@@ -29,7 +29,8 @@ const app = express();
 app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Max-Age', '3600');
   if (_req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -410,6 +411,54 @@ function buildRechazadaResponse(
     iva: 0,
   };
 }
+
+/** Frontend API Simulator endpoint */
+app.post('/api/simulate/spei', (req, res) => {
+  try {
+    const { debtorAlias, creditorAlias, amount, currency, purpose, reference } = req.body;
+
+    // Validation
+    if (!debtorAlias || !creditorAlias || !amount || !currency) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['debtorAlias', 'creditorAlias', 'amount', 'currency'],
+      });
+    }
+
+    // Simulate occasional failures (10%)
+    const shouldFail = Math.random() < 0.1;
+    const paymentId = `E${Date.now()}${Math.random().toString(36).substring(7)}`;
+    const timestamp = new Date().toISOString();
+
+    const responsePayload = {
+      payment_id: paymentId,
+      status: shouldFail ? 'failed' : 'completed',
+      rail: 'SPEI',
+      timestamp,
+      details: {
+        debtor: debtorAlias,
+        creditor: creditorAlias,
+        amount: Number(amount),
+        currency,
+        purpose: purpose ?? 'TRANSFERENCIA',
+        reference: reference ?? 'AUTO',
+        processor_latency_ms: Math.round(100 + Math.random() * 400),
+        error: shouldFail ? {
+          code: 'EC01',
+          message: 'Saldo insuficiente en cuenta origen',
+        } : null,
+      },
+    };
+
+    res.status(200).json(responsePayload);
+  } catch (err) {
+    logger.error(err, 'Error in /api/simulate/spei');
+    res.status(500).json({
+      error: 'Internal server error',
+      message: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+});
 
 export function startMockServer(port?: number): Promise<import('http').Server> {
   const listenPort = port ?? env.SPEI_MOCK_PORT;
