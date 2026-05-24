@@ -1,3 +1,9 @@
+/**
+ * @file index.ts
+ * @description Entry point for the SPEI adapter: bootstraps OTEL, starts the mock sandbox (if enabled), health server and RabbitMQ worker.
+ * @author Nicolás
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import { initTelemetry } from './observability/otel.js';
 const sdk = initTelemetry();
 

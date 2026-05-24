@@ -1,3 +1,9 @@
+/**
+ * @file rabbitmq.ts
+ * @description RabbitMQ connection bootstrap: asserts the topic exchange, declares the SPEI route queue with DLX, and binds the route.spei key.
+ * @author Nicolás
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import amqplib from 'amqplib';
 import type { ChannelModel, Channel } from 'amqplib';
 import { env } from '../config/env';

@@ -1,3 +1,9 @@
+/**
+ * @file response-mapper.ts
+ * @description Maps SPEI rail responses (LIQUIDADA/RECHAZADA/DEVUELTA/EN_PROCESO) to canonical RailAck status with CECOBAN error code propagation.
+ * @author Camila
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import type { SpeiCecobanResponse } from './types.js';
 
 export interface RailAck {

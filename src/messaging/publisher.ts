@@ -1,3 +1,9 @@
+/**
+ * @file publisher.ts
+ * @description Publishes SPEI rail ack messages back to the MIPIT exchange using the configured ack routing key.
+ * @author Nicolás
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import type { Channel } from 'amqplib';
 import type { PaymentAckMessage } from '../worker.js';
 import { env } from '../config/env.js';

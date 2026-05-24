@@ -1,3 +1,9 @@
+/**
+ * @file health-server.ts
+ * @description Express server exposing /health and /metrics (Prometheus) endpoints for the SPEI adapter.
+ * @author Nicolás
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import express from 'express';
 import { registry } from './observability/metrics.js';
 import { logger } from './observability/logger.js';

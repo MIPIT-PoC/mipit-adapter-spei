@@ -1,4 +1,11 @@
 /**
+ * @file clabe-validator.ts
+ * @description Validates CLABE (18-digit Mexican bank account) using the mod-10 check digit algorithm, and exposes helpers to extract bank/city/account components.
+ * @author Carlos
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
+
+/**
  * CLABE (Clave Bancaria Estandarizada) Validator
  * Based on: BANXICO CLABE specification
  *

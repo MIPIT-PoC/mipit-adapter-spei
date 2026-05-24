@@ -1,3 +1,9 @@
+/**
+ * @file otel.ts
+ * @description Initializes the OpenTelemetry Node SDK with auto-instrumentations and an OTLP/HTTP trace exporter for the SPEI adapter.
+ * @author Carlos
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';

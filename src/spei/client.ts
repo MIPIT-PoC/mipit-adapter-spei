@@ -1,3 +1,9 @@
+/**
+ * @file client.ts
+ * @description HTTP client for the SPEI/CECOBAN sandbox: handles OAuth2 client_credentials token caching, retry-on-401, and POSTs payments with configurable timeout and retries.
+ * @author Carlos
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import { env } from '../config/env.js';
 import { withRetry } from './retry.js';
 import type { SpeiCecobanRequest, SpeiCecobanResponse } from './types.js';

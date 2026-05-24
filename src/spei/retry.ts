@@ -1,3 +1,9 @@
+/**
+ * @file retry.ts
+ * @description Generic exponential-backoff retry helper used by the SPEI HTTP client; increments the speiRetryCount metric on each failed attempt.
+ * @author Miguel
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import { logger } from '../observability/logger.js';
 import { speiRetryCount } from '../observability/metrics.js';
 

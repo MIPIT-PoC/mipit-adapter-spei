@@ -1,3 +1,9 @@
+/**
+ * @file env.ts
+ * @description Zod-validated environment schema for the SPEI adapter (RabbitMQ URL, SPEI sandbox URL/mode, OTEL endpoint, health port).
+ * @author Nicolás
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import { z } from 'zod';
 import 'dotenv/config';
 

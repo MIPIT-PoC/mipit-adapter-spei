@@ -1,4 +1,11 @@
 /**
+ * @file oauth-mock.ts
+ * @description OAuth2 client_credentials mock for SPEI: issues bearer tokens with TTL, validates client_id/secret pairs and provides an Express middleware that protects non-public routes.
+ * @author Camila
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
+
+/**
  * OAuth2 Client Credentials Mock — SPEI (BANXICO / CECOBAN)
  *
  * Simulates the BANXICO/CECOBAN OAuth2 authentication flow used with SPEI APIs.

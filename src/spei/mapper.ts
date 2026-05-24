@@ -1,3 +1,9 @@
+/**
+ * @file mapper.ts
+ * @description Maps canonical pacs.008 PaymentMessage to SPEI/CECOBAN payload (claveRastreo, cuentaBeneficiario, monto, institución codes, tipoPago derived from ctgyPurp).
+ * @author Carlos
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import type { SpeiCecobanRequest } from './types.js';
 import { SPEI_BANXICO_CODES, generateSpeiClaveRastreo, generateSpeiReferencia, clabeToInstitutionCode } from './types.js';
 import { validateClabeDetailed } from './clabe-validator.js';

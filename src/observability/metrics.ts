@@ -1,3 +1,9 @@
+/**
+ * @file metrics.ts
+ * @description Prometheus metrics registry for the SPEI adapter: per-rail counters/histograms and the unified mipit_adapter_* P07 metrics (requests, latency, retries, errors).
+ * @author Carlos
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import client from 'prom-client';
 
 export const registry = new client.Registry();

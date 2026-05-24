@@ -1,4 +1,11 @@
 /**
+ * @file types.ts
+ * @description SPEI/CECOBAN domain types (request/response, estatus, tipoCuenta), Banxico institution-code catalog, CLABE-to-institution mapping and helpers to generate claveRastreo and referenciaNumerica.
+ * @author Miguel
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
+
+/**
  * SPEI (Sistema de Pagos Electrónicos Interbancarios) Types
  * Based on: BANXICO CECOBAN specification and SPEI+ API
  *

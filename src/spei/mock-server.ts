@@ -1,4 +1,11 @@
 /**
+ * @file mock-server.ts
+ * @description CECOBAN SPEI mock server simulating BANXICO settlement: idempotency by claveRastreo, CECOBAN rejection codes (R01..R09, LIM, BLQ, CAN), CLABE validation, operating-window enforcement and configurable rejection/latency.
+ * @author Camila
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
+
+/**
  * SPEI CECOBAN Mock Server
  *
  * Simulates the BANXICO SPEI sandbox endpoint for PoC testing.

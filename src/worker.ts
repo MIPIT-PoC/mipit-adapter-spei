@@ -1,3 +1,9 @@
+/**
+ * @file worker.ts
+ * @description RabbitMQ consumer that processes routed payments, maps them to SPEI/CECOBAN, dispatches them to the SPEI rail and publishes a pacs.002 ack back to the MIPIT exchange.
+ * @author Miguel
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
 import type { Channel, ConsumeMessage } from 'amqplib';
 import { randomUUID } from 'node:crypto';
 import { env } from './config/env.js';

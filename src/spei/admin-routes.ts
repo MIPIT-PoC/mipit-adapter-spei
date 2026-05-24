@@ -1,4 +1,11 @@
 /**
+ * @file admin-routes.ts
+ * @description Mock admin routes exposing rejection rate, latency, settlement delay and force-reject/timeout toggles to the Bank Simulator UI.
+ * @author Carlos
+ * @project MIPIT-PoC — Cross-border Instant Payments Middleware
+ */
+
+/**
  * Mock Admin Control Routes — SPEI
  *
  * Allows the Bank Simulator Dashboard (UI) to control mock behavior:
